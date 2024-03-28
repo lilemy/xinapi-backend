@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -61,6 +62,8 @@ public class InterfaceInfoServiceImpl extends ServiceImpl<InterfaceInfoMapper, I
             return queryWrapper;
         }
         String sortField = interfaceInfoQueryRequest.getSortField();
+        // 将驼峰字段转化为数据库的下划线字段
+        String underlineSortField = StrUtil.toUnderlineCase(sortField);
         String sortOrder = interfaceInfoQueryRequest.getSortOrder();
         Long id = interfaceInfoQueryRequest.getId();
         String name = interfaceInfoQueryRequest.getName();
@@ -80,11 +83,11 @@ public class InterfaceInfoServiceImpl extends ServiceImpl<InterfaceInfoMapper, I
         queryWrapper.like(StringUtils.isNotBlank(requestHeader), "request_header", requestHeader);
         queryWrapper.like(StringUtils.isNotBlank(responseHeader), "response_header", responseHeader);
         queryWrapper.eq(ObjectUtils.isNotEmpty(id), "id", id);
-        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
+        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "user_id", userId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(status), "status", status);
         queryWrapper.eq(ObjectUtils.isNotEmpty(method), "method", method);
         queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
-                sortField);
+                underlineSortField);
         return queryWrapper;
     }
 
@@ -109,6 +112,7 @@ public class InterfaceInfoServiceImpl extends ServiceImpl<InterfaceInfoMapper, I
         interfaceInfoVOListPage.setRecords(interfaceInfoVOList);
         return interfaceInfoVOListPage;
     }
+
 }
 
 

@@ -1,24 +1,27 @@
 package com.plum.xinapi.controller;
 
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.plum.xinapi.annotation.AuthCheck;
-import com.plum.xinapi.common.BaseResponse;
-import com.plum.xinapi.common.DeleteRequest;
-import com.plum.xinapi.common.ErrorCode;
-import com.plum.xinapi.common.ResultUtils;
+import com.plum.xinapi.common.*;
 import com.plum.xinapi.constant.UserConstant;
 import com.plum.xinapi.exception.BusinessException;
 import com.plum.xinapi.exception.ThrowUtils;
 import com.plum.xinapi.model.dto.interfaceinfo.InterfaceInfoAddRequest;
+import com.plum.xinapi.model.dto.interfaceinfo.InterfaceInfoInvokeRequest;
 import com.plum.xinapi.model.dto.interfaceinfo.InterfaceInfoQueryRequest;
 import com.plum.xinapi.model.dto.interfaceinfo.InterfaceInfoUpdateRequest;
 import com.plum.xinapi.model.entity.InterfaceInfo;
 import com.plum.xinapi.model.entity.User;
+import com.plum.xinapi.model.enums.InterfaceInfoStatusEnum;
 import com.plum.xinapi.model.vo.InterfaceInfoVO;
 import com.plum.xinapi.service.InterfaceInfoService;
 import com.plum.xinapi.service.UserService;
+import com.plum.xinapiclientsdk.client.XinApiClient;
+import com.plum.xinapiclientsdk.model.OperationNumber;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -192,4 +195,48 @@ public class InterfaceInfoController {
 
     // endregion
 
+    /**
+     * 测试在线调用
+     *
+     * @param interfaceInfoInvokeRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/invoke")
+    public BaseResponse<Object> invokeInterfaceInfo(@RequestBody InterfaceInfoInvokeRequest interfaceInfoInvokeRequest, HttpServletRequest request) {
+        if (interfaceInfoInvokeRequest == null || interfaceInfoInvokeRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 1. 校验接口是否存在
+        Long id = interfaceInfoInvokeRequest.getId();
+        String userRequestParams = interfaceInfoInvokeRequest.getUserRequestParams();
+        JSONObject jsonObject = JSONUtil.parseObj(userRequestParams);
+        log.info("params: {}", jsonObject);
+        if (userRequestParams == null) {// 在线调用获取名称接口时参数为空（有些接口不需要填写参数）
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        InterfaceInfo oldInterfaceInfo = interfaceInfoService.getById(id);
+        if (oldInterfaceInfo == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        // 2. 只有已经上线的接口才能下线
+        if (oldInterfaceInfo.getStatus() != InterfaceInfoStatusEnum.ONLINE.getValue()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该接口已关闭");
+        }
+        // 3. 调用接口
+        User loginUser = userService.getLoginUser(request);
+        String accessKey = loginUser.getAccessKey();
+        String secretKey = loginUser.getSecretKey();
+        XinApiClient apiClient = new XinApiClient(accessKey, secretKey);
+        if (id == 1) {// 调用求和接口
+            OperationNumber operationNumber = new OperationNumber();
+            operationNumber.setFirstNumber(jsonObject.getDouble("firstNumber"));
+            operationNumber.setSecondNumber(jsonObject.getDouble("secondNumber"));
+            log.info("operationNumber: {}", operationNumber);
+            String sum = apiClient.getSum(operationNumber);
+            return ResultUtils.success(sum);
+        } else {// id == 1 调用获取输入名称接口
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "暂无此接口");
+        }
+    }
 }
